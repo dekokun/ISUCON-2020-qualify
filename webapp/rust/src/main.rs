@@ -781,7 +781,7 @@ async fn post_estate(db: web::Data<Pool>, mut payload: Multipart) -> Result<Http
             insert_stmt.push(ch);
         }
         let v: Vec<String> = vec![];
-        dbg!(insert_stmt);
+        dbg!(&insert_stmt);
         dbg!(tx.exec_drop(insert_stmt, v))?;
         tx.commit()?;
         Ok(())
