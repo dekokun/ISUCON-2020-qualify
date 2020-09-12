@@ -7,7 +7,7 @@ services:
     command:
       ["wait-for-it", "db:3306", "-t", "30", "--", "/docker/start_app.sh"]
     volumes:
-      - ./webapp:/home/ishocon/webapp
+      - ./webapp:/home/isucon/webapp
     cap_add:
       - CAP_SYS_ADMIN
     ports:
@@ -17,10 +17,10 @@ services:
   db:
     image: mysql:5.7
     environment:
-      MYSQL_ROOT_PASSWORD: ishocon
-      MYSQL_DATABASE: ishocon2
-      MYSQL_USER: ishocon
-      MYSQL_PASSWORD: ishocon
+      MYSQL_ROOT_PASSWORD: isucon
+      MYSQL_DATABASE: isucon
+      MYSQL_USER: isucon
+      MYSQL_PASSWORD: isucon
     ports:
       - 13306:3306
     volumes:
