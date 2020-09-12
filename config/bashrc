@@ -1,0 +1,16 @@
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
+export PATH=$PATH:/home/ishocon/.cargo/bin
+
+export ISHOCON2_DB_HOST=localhost
+export ISHOCON2_DB_PORT=3306
+export ISHOCON2_DB_USER=ishocon
+export ISHOCON2_DB_PASSWORD=ishocon
+export ISHOCON2_DB_NAME=ishocon2
+
+alias ls='ls --color=auto'
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias grep='grep --color=auto'
