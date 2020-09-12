@@ -767,9 +767,21 @@ async fn post_estate(db: web::Data<Pool>, mut payload: Multipart) -> Result<Http
     web::block(move || {
         let mut conn = db.get().expect("Failed to checkout database connection");
         let mut tx = conn.start_transaction(mysql::TxOpts::default())?;
-        for estate in estates {
-            tx.exec_drop("insert into estate (id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (estate.id, estate.name, estate.description, estate.thumbnail, estate.address, estate.latitude, estate.longitude, estate.rent, estate.door_height, estate.door_width, estate.features, estate.popularity))?;
+        let mut insert_stmt = String::new();
+        insert_stmt.push_str("INSERT INTO estate (id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES");
+        let to_values = |estate: Estate| format!("({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})", estate.id, estate.name, estate.description, estate.thumbnail, estate.address, estate.latitude, estate.longitude, estate.rent, estate.door_height, estate.door_width, estate.features, estate.popularity);
+        let estates_len = estates.len();
+        for (index, estate) in estates.into_iter().enumerate() {
+            insert_stmt.push_str(&to_values(estate));
+            let ch = if index < estates_len - 1 {
+                ','
+            } else {
+                ';'
+            };
+            insert_stmt.push(ch);
         }
+        let v: Vec<String> = vec![];
+        tx.exec_drop(insert_stmt, v)?;
         tx.commit()?;
         Ok(())
     }).await.map_err(
