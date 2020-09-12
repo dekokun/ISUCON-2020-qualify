@@ -49,12 +49,6 @@ impl VecEstate {
     }
 }
 
-#[derive(Debug, Clone)]
-struct MySQLPools {
-    chair: Pool,
-    estate: Pool,
-}
-
 impl Default for MySQLConnectionEnv {
     fn default() -> Self {
         let port = if let Ok(port) = env::var("MYSQL_PORT") {
