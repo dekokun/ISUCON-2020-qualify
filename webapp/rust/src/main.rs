@@ -209,7 +209,7 @@ async fn initialize(
         }
     }
     Ok(HttpResponse::Ok().json(InitializeResponse {
-        language: "rust".to_owned(),
+        language: "krouton".to_owned(),
     }))
 }
 
@@ -409,6 +409,8 @@ struct ChairSearchResponse {
     chairs: Vec<Chair>,
 }
 
+
+// GET /api/chair/search
 async fn search_chairs(
     chair_search_condition: web::Data<Arc<ChairSearchCondition>>,
     db: web::Data<Pool>,
@@ -572,6 +574,7 @@ struct ChairListResponse {
     chairs: Vec<Chair>,
 }
 
+// GET /api/chair/low_priced
 async fn get_low_priced_chair(db: web::Data<Pool>) -> Result<HttpResponse, AWError> {
     let chairs = web::block(move || {
         let mut conn = db.get().expect("Failed to checkout database connection");
