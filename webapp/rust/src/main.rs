@@ -796,6 +796,12 @@ struct SearchEstatesParams {
     per_page: i64,
 }
 
+impl SearchEstatesParams {
+    fn is_special_case(&self) -> bool {
+        !self.rent_range_id.is_empty() && self.door_height_range_id.is_empty() && self.door_width_range_id.is_empty() && self.features.is_empty() && self.page == 0
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct EstateSearchResponse {
     count: i64,
@@ -809,6 +815,48 @@ async fn search_estates(
 ) -> Result<HttpResponse, AWError> {
     let mut conditions = Vec::new();
     let mut params: Vec<mysql::Value> = Vec::new();
+
+    if query_params.is_special_case() {
+        if let Some(estate_rent) = get_range(&estate_search_condition.rent, &query_params.rent_range_id) {
+            if estate_rent.min != -1 {
+                conditions.push("rent >= ?");
+                params.push(estate_rent.min.into());
+            }
+            if estate_rent.max != -1 {
+                conditions.push("rent < ?");
+                params.push(estate_rent.max.into());
+            }
+            let per_page = query_params.per_page;
+            let page = query_params.page;
+
+            let search_condition = conditions.join(" and ");
+            let res = web::block(move || {
+                let mut conn = db.get().expect("Failed to checkout database connection");
+                let row = conn.exec_first(
+                    format!("select count(*) from estate where {}", search_condition),
+                    &params,
+                )?;
+                let count = row.map(|(c,)| c).unwrap_or(0);
+        
+                params.push(per_page.into());
+                params.push((page * per_page).into());
+                let estates = conn.exec(
+                    format!(
+                        "select * from estate where {} order by popularity desc, id asc limit ? offset ?",
+                        search_condition
+                    ),
+                    &params,
+                )?;
+                Ok(EstateSearchResponse { count, estates })
+            })
+            .await
+            .map_err(|e: BlockingDBError| {
+                log::error!("search_estates DB execution error : {:?}", e);
+                HttpResponse::InternalServerError()
+            })?;
+            return Ok(HttpResponse::Ok().json(res))
+        }
+    }
 
     if !query_params.door_height_range_id.is_empty() {
         if let Some(door_height) = get_range(
