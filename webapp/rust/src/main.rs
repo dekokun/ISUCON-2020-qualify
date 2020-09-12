@@ -58,23 +58,36 @@ async fn main() -> std::io::Result<()> {
         Arc::new(serde_json::from_reader(file)?)
     };
 
-    let manager = r2d2_mysql::MysqlConnectionManager::new(
+    let chairManager = r2d2_mysql::MysqlConnectionManager::new(
         mysql::OptsBuilder::new()
-            .ip_or_hostname(Some(&mysql_connection_env.host))
+            .ip_or_hostname(Some("10.164.50.101"))
             .tcp_port(mysql_connection_env.port)
             .user(Some(&mysql_connection_env.user))
             .db_name(Some(&mysql_connection_env.db_name))
             .pass(Some(&mysql_connection_env.password)),
     );
-    let pool = r2d2::Pool::builder()
+    let chairPool = r2d2::Pool::builder()
         .max_size(10)
-        .build(manager)
+        .build(chairManager)
+        .expect("Failed to create connection pool");
+    let estateManager = r2d2_mysql::MysqlConnectionManager::new(
+        mysql::OptsBuilder::new()
+            .ip_or_hostname(Some("10.164.50.102"))
+            .tcp_port(mysql_connection_env.port)
+            .user(Some(&mysql_connection_env.user))
+            .db_name(Some(&mysql_connection_env.db_name))
+            .pass(Some(&mysql_connection_env.password)),
+    );
+    let estatePool = r2d2::Pool::builder()
+        .max_size(10)
+        .build(estateManager)
         .expect("Failed to create connection pool");
 
     let mut listenfd = ListenFd::from_env();
     let server = HttpServer::new(move || {
         App::new()
-            .data(pool.clone())
+            .data(estatePool.clone())
+            .data(chairPool.clone())
             .data(mysql_connection_env.clone())
             .data(chair_search_condition.clone())
             .data(estate_search_condition.clone())
