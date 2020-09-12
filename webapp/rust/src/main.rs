@@ -439,7 +439,7 @@ struct ChairSearchResponse {
 
 async fn search_chairs(
     chair_search_condition: web::Data<Arc<ChairSearchCondition>>,
-    chairDb: web::Data<MySQLPools>,
+    db: web::Data<MySQLPools>,
     query_params: web::Query<SearchChairsParams>,
 ) -> Result<HttpResponse, AWError> {
     let mut conditions = Vec::new();
@@ -559,7 +559,7 @@ async fn search_chairs(
 
     let search_condition = conditions.join(" and ");
     let res = web::block(move || {
-        let mut conn = chairDb
+        let mut conn = db
             .chair
             .get()
             .expect("Failed to checkout database connection");
