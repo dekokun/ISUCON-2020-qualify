@@ -798,7 +798,11 @@ struct SearchEstatesParams {
 
 impl SearchEstatesParams {
     fn is_special_case(&self) -> bool {
-        !self.rent_range_id.is_empty() && self.door_height_range_id.is_empty() && self.door_width_range_id.is_empty() && self.features.is_empty() && self.page == 0
+        !self.rent_range_id.is_empty()
+            && self.door_height_range_id.is_empty()
+            && self.door_width_range_id.is_empty()
+            && self.features.is_empty()
+            && self.page == 0
     }
 }
 
@@ -817,7 +821,9 @@ async fn search_estates(
     let mut params: Vec<mysql::Value> = Vec::new();
 
     if query_params.is_special_case() {
-        if let Some(estate_rent) = get_range(&estate_search_condition.rent, &query_params.rent_range_id) {
+        if let Some(estate_rent) =
+            get_range(&estate_search_condition.rent, &query_params.rent_range_id)
+        {
             if estate_rent.min != -1 {
                 conditions.push("rent >= ?");
                 params.push(estate_rent.min.into());
@@ -854,7 +860,7 @@ async fn search_estates(
                 log::error!("search_estates DB execution error : {:?}", e);
                 HttpResponse::InternalServerError()
             })?;
-            return Ok(HttpResponse::Ok().json(res))
+            return Ok(HttpResponse::Ok().json(res));
         }
     }
 
