@@ -963,6 +963,8 @@ async fn search_recommended_estate_with_chair(
             c.sort();
             let first = c[0];
             let second = c[1];
+            // 最初100件とって、アプリケーションでdoor_width, door_heightでfilter
+            // 20件なかったら、以下クエリにフォールバック
             let query = "select * from estate where(door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
             let params: Vec<mysql::Value> = vec![
                 second.into(),
