@@ -1,8 +1,9 @@
 #!/bin/bash
 
 set -v
+server=${1-isu1}
 
 command="cat /var/log/nginx/access.log | alp --matching-groups '/api/estate/\d+,/api/estate/req_doc/\d+,/api/chair/\d+,/api/chair/buy/\d+,/api/recommended_estate/\d+' --sort=sum --reverse -o count,2xx,method,uri,min,max,sum,avg,p99 ltsv"
 
 echo "It's $(date)"
-ssh isu1 "$command"
+ssh $server "$command"
