@@ -24,6 +24,37 @@ struct MySQLConnectionEnv {
     password: String,
 }
 
+#[derive(Debug, Clone)]
+struct MySQLPools {
+    chair: Pool,
+    estate: Pool,
+}
+
+#[derive(Debug, Clone)]
+struct VecEstate {
+    estates: Vec<Estate>,
+}
+
+impl VecEstate {
+    fn get(&self) -> Option<Vec<Estate>> {
+        let estates = self.estates.clone();
+        if estates.is_empty() {
+            None
+        } else {
+            Some(estates)
+        }
+    }
+    fn set(&mut self, estates: Vec<Estate>) {
+        self.estates = estates;
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MySQLPools {
+    chair: Pool,
+    estate: Pool,
+}
+
 impl Default for MySQLConnectionEnv {
     fn default() -> Self {
         let port = if let Ok(port) = env::var("MYSQL_PORT") {
@@ -71,6 +102,7 @@ async fn main() -> std::io::Result<()> {
         .build(manager)
         .expect("Failed to create connection pool");
 
+    let estates = VecEstate { estates: vec![] };
     let mut listenfd = ListenFd::from_env();
     let server = HttpServer::new(move || {
         App::new()
@@ -78,6 +110,7 @@ async fn main() -> std::io::Result<()> {
             .data(mysql_connection_env.clone())
             .data(chair_search_condition.clone())
             .data(estate_search_condition.clone())
+            .data(estates.clone())
             .wrap(middleware::Logger::default())
             .route("/initialize", web::post().to(initialize))
             .service(
@@ -949,6 +982,7 @@ async fn get_estate_search_condition(
 async fn search_recommended_estate_with_chair(
     db: web::Data<Pool>,
     path: web::Path<(i64,)>,
+    estates: web::Data<VecEstate>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
@@ -963,11 +997,15 @@ async fn search_recommended_estate_with_chair(
             c.sort();
             let first = c[0];
             let second = c[1];
-            // 最初100件とって、アプリケーションでdoor_width, door_heightでfilter
-            let query = "select * from estate order by popularity desc, id asc limit ?";
-            let temp_limit = 100;
-            let params:Vec<mysql::Value> = vec![temp_limit.into()];
-            let estates: Vec<Estate> =  conn.exec(query, params)?;
+            let estates = if estates.get().is_none() {
+                // 最初100件とって、アプリケーションでdoor_width, door_heightでfilter
+                let query = "select * from estate order by popularity desc, id asc limit ?";
+                let temp_limit = 100;
+                let params:Vec<mysql::Value> = vec![temp_limit.into()];
+                estate_conn.exec(query, params)?
+            } else {
+                estates.get().unwrap()
+            };
             let filtered: Vec<_> = estates.into_iter().filter(|estate| (estate.door_height >= first && estate.door_width >= second) || (estate.door_height >= second && estate.door_width >= first)).collect();
             if filtered.len() >= LIMIT as usize {
                 let v = filtered[..LIMIT as usize].to_vec();
