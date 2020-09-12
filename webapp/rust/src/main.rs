@@ -769,7 +769,7 @@ async fn post_estate(db: web::Data<Pool>, mut payload: Multipart) -> Result<Http
         let mut tx = conn.start_transaction(mysql::TxOpts::default())?;
         let mut insert_stmt = String::new();
         insert_stmt.push_str("INSERT INTO estate (id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) VALUES ");
-        let to_values = |estate: Estate| format!("({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})", estate.id, estate.name, estate.description, estate.thumbnail, estate.address, estate.latitude, estate.longitude, estate.rent, estate.door_height, estate.door_width, estate.features, estate.popularity);
+        let to_values = |estate: Estate| format!("({}, \"{}\", \"{}\", \"{}\", \"{}\", {}, {}, {}, {}, {}, \"{}\", {})", estate.id, estate.name, estate.description, estate.thumbnail, estate.address, estate.latitude, estate.longitude, estate.rent, estate.door_height, estate.door_width, estate.features, estate.popularity);
         let estates_len = estates.len();
         for (index, estate) in estates.into_iter().enumerate() {
             insert_stmt.push_str(&to_values(estate));
