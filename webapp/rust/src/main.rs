@@ -959,20 +959,12 @@ async fn search_recommended_estate_with_chair(
             let w = chair.width;
             let h = chair.height;
             let d = chair.depth;
-            let query = "select * from estate where (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
+            use std::cmp::max;
+            let m = max(w, max(h, d));
+            let query = "select * from estate where (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
             let params: Vec<mysql::Value> = vec![
-                w.into(),
-                h.into(),
-                w.into(),
-                d.into(),
-                h.into(),
-                w.into(),
-                h.into(),
-                d.into(),
-                d.into(),
-                w.into(),
-                d.into(),
-                h.into(),
+                m.into(),
+                m.into(),
                 LIMIT.into(),
             ];
             Ok(Some(conn.exec(query, params)?))
