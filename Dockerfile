@@ -32,6 +32,7 @@ WORKDIR webapp/rust/
 RUN cargo install cargo-profiler
 RUN cargo install flamegraph
 RUN cargo install cargo-watch
+RUN cargo install systemfd
 
 # Nginx 周りの設定
 # COPY admin/ssl/ /etc/nginx/ssl/

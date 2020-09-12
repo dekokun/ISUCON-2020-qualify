@@ -11,7 +11,7 @@ services:
     cap_add:
       - CAP_SYS_ADMIN
     ports:
-      - "443:443"
+      - "8081:8080"
     # for flamegraph outputh
     stop_grace_period: 5m
     container_name: isucon_app
