@@ -83,18 +83,34 @@ async fn main() -> std::io::Result<()> {
         Arc::new(serde_json::from_reader(file)?)
     };
 
-    let manager = r2d2_mysql::MysqlConnectionManager::new(
+    let chair_manager = r2d2_mysql::MysqlConnectionManager::new(
         mysql::OptsBuilder::new()
-            .ip_or_hostname(Some(&mysql_connection_env.host))
+            .ip_or_hostname(Some("10.164.50.101"))
             .tcp_port(mysql_connection_env.port)
             .user(Some(&mysql_connection_env.user))
             .db_name(Some(&mysql_connection_env.db_name))
             .pass(Some(&mysql_connection_env.password)),
     );
-    let pool = r2d2::Pool::builder()
+    let chair_pool = r2d2::Pool::builder()
         .max_size(10)
-        .build(manager)
+        .build(chair_manager)
         .expect("Failed to create connection pool");
+    let estate_manager = r2d2_mysql::MysqlConnectionManager::new(
+        mysql::OptsBuilder::new()
+            .ip_or_hostname(Some("10.164.50.102"))
+            .tcp_port(mysql_connection_env.port)
+            .user(Some(&mysql_connection_env.user))
+            .db_name(Some(&mysql_connection_env.db_name))
+            .pass(Some(&mysql_connection_env.password)),
+    );
+    let estate_pool = r2d2::Pool::builder()
+        .max_size(10)
+        .build(estate_manager)
+        .expect("Failed to create connection pool");
+    let pool = MySQLPools {
+        estate: estate_pool,
+        chair: chair_pool,
+    };
 
     let estates = VecEstate { estates: vec![] };
     let mut listenfd = ListenFd::from_env();
@@ -204,6 +220,9 @@ struct InitializeResponse {
 async fn initialize(
     mysql_connection_env: web::Data<Arc<MySQLConnectionEnv>>,
 ) -> Result<HttpResponse, AWError> {
+    let c = reqwest::Client::new();
+    let _ = c.post("http://10.164.50.101/initialize").send().await;
+    let _ = c.post("http://10.164.50.102/initialize").send().await;
     let sql_dir = std::path::Path::new("..").join("mysql").join("db");
     let paths = [
         sql_dir.join("0_Schema.sql"),
@@ -283,13 +302,16 @@ impl FromRow for Chair {
 }
 
 async fn get_chair_detail(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
     let chair: Option<Chair> = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .chair
+            .get()
+            .expect("Failed to checkout database connection");
         conn.exec_first("select * from chair where id = ?", (id,))
     })
     .await
@@ -348,7 +370,10 @@ impl Into<Chair> for CSVChair {
     }
 }
 
-async fn post_chair(db: web::Data<Pool>, mut payload: Multipart) -> Result<HttpResponse, AWError> {
+async fn post_chair(
+    db: web::Data<MySQLPools>,
+    mut payload: Multipart,
+) -> Result<HttpResponse, AWError> {
     let mut chairs: Option<Vec<Chair>> = None;
     while let Ok(Some(field)) = payload.try_next().await {
         let content_disposition = field.content_disposition().unwrap();
@@ -379,8 +404,8 @@ async fn post_chair(db: web::Data<Pool>, mut payload: Multipart) -> Result<HttpR
     let chairs = chairs.unwrap();
 
     web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
-        let mut tx = conn.start_transaction(mysql::TxOpts::default())?;
+        let mut chair_conn = db.chair.get().expect("Failed to checkout database connection");
+        let mut tx = chair_conn.start_transaction(mysql::TxOpts::default())?;
         for chair in chairs {
             let params: Vec<mysql::Value> = vec![
                 chair.id.into(),
@@ -438,7 +463,7 @@ struct ChairSearchResponse {
 
 async fn search_chairs(
     chair_search_condition: web::Data<Arc<ChairSearchCondition>>,
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     query_params: web::Query<SearchChairsParams>,
 ) -> Result<HttpResponse, AWError> {
     let mut conditions = Vec::new();
@@ -558,7 +583,10 @@ async fn search_chairs(
 
     let search_condition = conditions.join(" and ");
     let res = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .chair
+            .get()
+            .expect("Failed to checkout database connection");
         let row = conn.exec_first(
             format!("select count(*) from chair where {}", search_condition),
             &params,
@@ -599,10 +627,13 @@ struct ChairListResponse {
     chairs: Vec<Chair>,
 }
 
-async fn get_low_priced_chair(db: web::Data<Pool>) -> Result<HttpResponse, AWError> {
+async fn get_low_priced_chair(db: web::Data<MySQLPools>) -> Result<HttpResponse, AWError> {
     let chairs = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
-        conn.exec(
+        let mut chair_conn = db
+            .chair
+            .get()
+            .expect("Failed to checkout database connection");
+        chair_conn.exec(
             "select * from chair where stock > 0 order by price asc, id asc limit ?",
             (LIMIT,),
         )
@@ -628,14 +659,17 @@ struct BuyChairRequest {
 }
 
 async fn buy_chair(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
     _params: web::Json<BuyChairRequest>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
     let found: bool = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .chair
+            .get()
+            .expect("Failed to checkout database connection");
         let mut tx = conn.start_transaction(mysql::TxOpts::default())?;
         let row: Option<Chair> = tx.exec_first(
             "select * from chair where id = ? and stock > 0 for update",
@@ -704,13 +738,16 @@ impl FromRow for Estate {
 }
 
 async fn get_estate_detail(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
     let estate: Option<Estate> = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .estate
+            .get()
+            .expect("Failed to checkout database connection");
         conn.exec_first("select * from estate where id = ?", (id,))
     })
     .await
@@ -761,7 +798,10 @@ impl Into<Estate> for CSVEstate {
     }
 }
 
-async fn post_estate(db: web::Data<Pool>, mut payload: Multipart) -> Result<HttpResponse, AWError> {
+async fn post_estate(
+    db: web::Data<MySQLPools>,
+    mut payload: Multipart,
+) -> Result<HttpResponse, AWError> {
     let mut estates: Option<Vec<Estate>> = None;
     while let Ok(Some(field)) = payload.try_next().await {
         let content_disposition = field.content_disposition().unwrap();
@@ -792,7 +832,7 @@ async fn post_estate(db: web::Data<Pool>, mut payload: Multipart) -> Result<Http
     let estates = estates.unwrap();
 
     web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db.estate.get().expect("Failed to checkout database connection");
         let mut tx = conn.start_transaction(mysql::TxOpts::default())?;
         for estate in estates {
             tx.exec_drop("insert into estate (id, name, description, thumbnail, address, latitude, longitude, rent, door_height, door_width, features, popularity) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (estate.id, estate.name, estate.description, estate.thumbnail, estate.address, estate.latitude, estate.longitude, estate.rent, estate.door_height, estate.door_width, estate.features, estate.popularity))?;
@@ -831,7 +871,7 @@ struct EstateSearchResponse {
 
 async fn search_estates(
     estate_search_condition: web::Data<Arc<EstateSearchCondition>>,
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     query_params: web::Query<SearchEstatesParams>,
 ) -> Result<HttpResponse, AWError> {
     let mut conditions = Vec::new();
@@ -919,7 +959,10 @@ async fn search_estates(
 
     let search_condition = conditions.join(" and ");
     let res = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .estate
+            .get()
+            .expect("Failed to checkout database connection");
         let row = conn.exec_first(
             format!("select count(*) from estate where {}", search_condition),
             &params,
@@ -950,9 +993,12 @@ struct EstateListResponse {
     estates: Vec<Estate>,
 }
 
-async fn get_low_priced_estate(db: web::Data<Pool>) -> Result<HttpResponse, AWError> {
+async fn get_low_priced_estate(db: web::Data<MySQLPools>) -> Result<HttpResponse, AWError> {
     let estates = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .estate
+            .get()
+            .expect("Failed to checkout database connection");
         conn.exec(
             "select * from estate order by rent asc, id asc limit ?",
             (LIMIT,),
@@ -974,15 +1020,16 @@ async fn get_estate_search_condition(
 }
 
 async fn search_recommended_estate_with_chair(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
     estates: web::Data<VecEstate>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
     let estates = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
-        let chair: Option<Chair> = conn.exec_first("select * from chair where id = ?", (id,))?;
+        let mut chair_conn = db.chair.get().expect("Failed to checkout database connection");
+        let mut estate_conn = db.estate.get().expect("Failed to checkout database connection");
+        let chair: Option<Chair> = chair_conn.exec_first("select * from chair where id = ?", (id,))?;
         if let Some(chair) = chair {
             let w = chair.width;
             let h = chair.height;
@@ -1014,7 +1061,7 @@ async fn search_recommended_estate_with_chair(
                     second.into(),
                     LIMIT.into(),
                 ];
-                Ok(Some(conn.exec(query, params)?))
+                Ok(Some(estate_conn.exec(query, params)?))
             }
         } else {
             Ok(None)
@@ -1090,7 +1137,7 @@ struct BoundingBox {
 }
 
 async fn search_estate_nazotte(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     coordinates: web::Json<Coordinates>,
 ) -> Result<HttpResponse, AWError> {
     if coordinates.coordinates.is_empty() {
@@ -1099,7 +1146,7 @@ async fn search_estate_nazotte(
     let bounding_box = coordinates.get_bounding_box();
 
     let mut estates = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db.estate.get().expect("Failed to checkout database connection");
         let query = "select * from estate where latitude <= ? and latitude >= ? and longitude <= ? and longitude >= ? order by popularity desc, id asc";
         let estates_in_bounding_box: Vec<Estate> = conn.exec(query, (bounding_box.bottom_right_corner.latitude, bounding_box.top_left_corner.latitude, bounding_box.bottom_right_corner.longitude, bounding_box.top_left_corner.longitude))?;
         if estates_in_bounding_box.is_empty() {
@@ -1135,14 +1182,17 @@ struct PostEstateRequestDocumentParams {
 }
 
 async fn post_estate_request_document(
-    db: web::Data<Pool>,
+    db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
     _params: web::Json<PostEstateRequestDocumentParams>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
     let estate: Option<Estate> = web::block(move || {
-        let mut conn = db.get().expect("Failed to checkout database connection");
+        let mut conn = db
+            .estate
+            .get()
+            .expect("Failed to checkout database connection");
         conn.exec_first("select * from estate where id = ?", (id,))
     })
     .await
