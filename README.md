@@ -1,3 +1,3 @@
-isu1: mysql + rust app
-isu2: mysql + rust app
+isu1: mysql(chair) + rust app
+isu2: mysql(estate) + rust app
 isu3: rust app
