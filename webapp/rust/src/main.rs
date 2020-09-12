@@ -635,7 +635,7 @@ async fn buy_chair(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Estate {
     id: i64,
     name: String,
@@ -964,16 +964,26 @@ async fn search_recommended_estate_with_chair(
             let first = c[0];
             let second = c[1];
             // 最初100件とって、アプリケーションでdoor_width, door_heightでfilter
-            // 20件なかったら、以下クエリにフォールバック
-            let query = "select * from estate where(door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
-            let params: Vec<mysql::Value> = vec![
-                second.into(),
-                first.into(),
-                first.into(),
-                second.into(),
-                LIMIT.into(),
-            ];
-            Ok(Some(conn.exec(query, params)?))
+            let query = "select * from estate order by popularity desc, id asc limit ?";
+            let temp_limit = 100;
+            let params:Vec<mysql::Value> = vec![temp_limit.into()];
+            let estates: Vec<Estate> =  conn.exec(query, params)?;
+            let filtered: Vec<_> = estates.into_iter().filter(|estate| (estate.door_height >= first && estate.door_width >= second) || (estate.door_height >= second && estate.door_width >= first)).collect();
+            if filtered.len() >= LIMIT as usize {
+                let v = filtered[..LIMIT as usize].to_vec();
+                Ok(Some(v))
+            } else {
+                // 20件なかったらフォールバック
+                let query = "select * from estate where (door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
+                let params: Vec<mysql::Value> = vec![
+                    second.into(),
+                    first.into(),
+                    first.into(),
+                    second.into(),
+                    LIMIT.into(),
+                ];
+                Ok(Some(conn.exec(query, params)?))
+            }
         } else {
             Ok(None)
         }
