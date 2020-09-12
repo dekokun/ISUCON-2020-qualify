@@ -801,7 +801,9 @@ impl Into<Estate> for CSVEstate {
 async fn post_estate(
     db: web::Data<MySQLPools>,
     mut payload: Multipart,
+    estates: web::Data<Mutex<VecEstate>>,
 ) -> Result<HttpResponse, AWError> {
+    estates.lock().unwrap().set(vec![]);
     let mut estates: Option<Vec<Estate>> = None;
     while let Ok(Some(field)) = payload.try_next().await {
         let content_disposition = field.content_disposition().unwrap();
