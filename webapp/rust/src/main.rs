@@ -7,7 +7,7 @@ use mysql::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 type Pool = r2d2::Pool<r2d2_mysql::MysqlConnectionManager>;
 type BlockingDBError = actix_web::error::BlockingError<mysql::Error>;
@@ -1022,7 +1022,7 @@ async fn get_estate_search_condition(
 async fn search_recommended_estate_with_chair(
     db: web::Data<MySQLPools>,
     path: web::Path<(i64,)>,
-    estates: web::Data<VecEstate>,
+    estates: web::Data<Mutex<VecEstate>>,
 ) -> Result<HttpResponse, AWError> {
     let id = path.0;
 
@@ -1038,17 +1038,17 @@ async fn search_recommended_estate_with_chair(
             c.sort();
             let first = c[0];
             let second = c[1];
-            let estates = if estates.get().is_none() {
+            let estates = if estates.lock().unwrap().get().is_none() {
                 // 最初100件とって、アプリケーションでdoor_width, door_heightでfilter
                 let query = "select * from estate order by popularity desc, id asc limit ?";
                 let temp_limit = 100;
                 let params:Vec<mysql::Value> = vec![temp_limit.into()];
                 let estates_tmp = estate_conn.exec(query, params)?;
-                let mut estates = estates;
-                estates.set(estates_tmp);
+                let mut estates = estates.lock().unwrap();
+                estates.set(estates_tmp.clone());
                 estates_tmp
             } else {
-                estates.get().unwrap()
+                estates.lock().unwrap().get().unwrap()
             };
             let filtered: Vec<_> = estates.into_iter().filter(|estate| (estate.door_height >= first && estate.door_width >= second) || (estate.door_height >= second && estate.door_width >= first)).collect();
             if filtered.len() >= LIMIT as usize {
