@@ -1,0 +1,30 @@
+version: "3.0"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      ["wait-for-it", "db:3306", "-t", "30", "--", "/docker/start_app.sh"]
+    volumes:
+      - ./webapp:/home/ishocon/webapp
+    cap_add:
+      - CAP_SYS_ADMIN
+    ports:
+      - "443:443"
+    # for flamegraph outputh
+    stop_grace_period: 5m
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: ishocon
+      MYSQL_DATABASE: ishocon2
+      MYSQL_USER: ishocon
+      MYSQL_PASSWORD: ishocon
+    ports:
+      - 13306:3306
+    volumes:
+      - ./docker/mysql:/var/lib/mysql
+    container_name: mysql
+volumes:
+  storage_app:
