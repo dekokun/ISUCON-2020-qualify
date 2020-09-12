@@ -1043,7 +1043,10 @@ async fn search_recommended_estate_with_chair(
                 let query = "select * from estate order by popularity desc, id asc limit ?";
                 let temp_limit = 100;
                 let params:Vec<mysql::Value> = vec![temp_limit.into()];
-                estate_conn.exec(query, params)?
+                let estates_tmp = estate_conn.exec(query, params)?;
+                let mut estates = estates;
+                estates.set(estates_tmp);
+                estates_tmp
             } else {
                 estates.get().unwrap()
             };
