@@ -6,15 +6,16 @@ root=$(cd "$(dirname "$0")" && cd .. && pwd)
 now=$(date +%Y%m%d-%H%M%S)
 
 branch=${1-master}
+server=${2-isu1}
 
 command="source ~/.bashrc && cd /home/isucon/ISUCON-2020-qualify/webapp/rust && git remote update && git checkout $branch && git pull && make build && sudo systemctl restart isuumo.rust"
 rotate_nginx="sudo mv /var/log/nginx/access.log /var/log/nginx/access.log.$now && sudo ln -sf /var/log/nginx/access.log.$now /var/log/nginx/access.log.latest; sudo systemctl reload nginx.service"
 rotate_mysql="sudo mv /var/log/mysql/slow.log /var/log/mysql/slow.log.$now && sudo ln -sf /var/log/mysql/slow.log.$now /var/log/mysql/slow.log.latest; mysqladmin -uisucon -pisucon flush-logs"
 
 # rust deploy
-ssh isu1 "$command"
+ssh $server "$command"
 
 # nginx lotate
-ssh isu1 "$rotate_nginx"
+ssh $server "$rotate_nginx"
 # mysql lotate
-ssh isu1 "$rotate_mysql"
+ssh $server "$rotate_mysql"
