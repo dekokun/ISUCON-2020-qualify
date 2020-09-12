@@ -5,4 +5,4 @@ set -v
 command="sudo cat /var/log/mysql/slow.log | pt-query-digest"
 
 echo "It's $(date)"
-ssh isu01 "$command"
+ssh isu1 "$command"
