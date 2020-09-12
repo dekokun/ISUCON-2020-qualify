@@ -177,6 +177,9 @@ struct InitializeResponse {
 async fn initialize(
     mysql_connection_env: web::Data<Arc<MySQLConnectionEnv>>,
 ) -> Result<HttpResponse, AWError> {
+    let c = reqwest::Client::new();
+    let _ = c.post("http://10.164.50.101/initialize").send().await;
+    let _ = c.post("http://10.164.50.102/initialize").send().await;
     let sql_dir = std::path::Path::new("..").join("mysql").join("db");
     let paths = [
         sql_dir.join("0_Schema.sql"),
