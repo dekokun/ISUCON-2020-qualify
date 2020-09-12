@@ -963,7 +963,7 @@ async fn search_recommended_estate_with_chair(
             c.sort();
             let first = c[0];
             let second = c[1];
-            let query = "select * from estate where(door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) or order by popularity desc, id asc limit ?";
+            let query = "select * from estate where(door_width >= ? and door_height >= ?) or (door_width >= ? and door_height >= ?) order by popularity desc, id asc limit ?";
             let params: Vec<mysql::Value> = vec![
                 second.into(),
                 first.into(),
