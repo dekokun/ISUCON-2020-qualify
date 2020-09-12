@@ -1,7 +1,7 @@
 run:
-	cargo run --release
+	/home/isucon/.cargo/bin/cargo run --release
 build:
-	cargo build --locked --release
+	/home/isucon/.cargo/bin/cargo build --locked --release
 
 rundev:
 	# systemfd and cargo-watch is required for autoloading
