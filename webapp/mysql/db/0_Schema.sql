@@ -39,3 +39,4 @@ CREATE TABLE isuumo.chair
 
 CREATE INDEX price ON isuumo.chair (price);
 CREATE INDEX rent ON isuumo.estate (rent);
+CREATE INDEX latitude_longitude ON isuumo.estate (latitude,longitude);
