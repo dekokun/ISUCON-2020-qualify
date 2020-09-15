@@ -1,3 +1,5 @@
 target/
 docker/mysql/
+docker/cargo_home
+docker/target
 

@@ -2,3 +2,5 @@
 webapp/
 !webapp/rust/rust-toolchain
 docker/mysql/
+docker/cargo_home
+docker/target

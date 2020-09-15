@@ -4,4 +4,5 @@ CURRENT_DIR=$(
     pwd
 )
 cd $CURRENT_DIR/../webapp/rust/
+export CARGO_HOME=/webapp/cargo_home
 make rundev
