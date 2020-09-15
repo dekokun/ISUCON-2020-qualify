@@ -8,10 +8,17 @@ services:
       ["wait-for-it", "db:3306", "-t", "30", "--", "/docker/start_app.sh"]
     volumes:
       - ./webapp:/webapp
+      - ./docker/target:/webapp/rust/target
+      - ./docker/cargo_home:/webapp/cargo_home
     cap_add:
       - CAP_SYS_ADMIN
     ports:
-      - "8081:8080"
+      - "1323:1323"
+    environment:
+      MYSQL_HOST: isucon_db
+      CHAIR_MYSQL_HOST: isucon_db
+      ESTATE_MYSQL_HOST: isucon_db
+      MYSQL_PORT: 3306
     # for flamegraph outputh
     stop_grace_period: 5m
     container_name: isucon_app
@@ -27,5 +34,3 @@ services:
     volumes:
       - ./docker/mysql:/var/lib/mysql
     container_name: isucon_db
-volumes:
-  storage_app:
