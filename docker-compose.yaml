@@ -11,7 +11,12 @@ services:
     cap_add:
       - CAP_SYS_ADMIN
     ports:
-      - "8081:8080"
+      - "1323:1323"
+    environment:
+      MYSQL_HOST: isucon_db
+      CHAIR_MYSQL_HOST: isucon_db
+      ESTATE_MYSQL_HOST: isucon_db
+      MYSQL_PORT: 3306
     # for flamegraph outputh
     stop_grace_period: 5m
     container_name: isucon_app

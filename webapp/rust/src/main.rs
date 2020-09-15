@@ -66,7 +66,9 @@ async fn main() -> std::io::Result<()> {
 
     let chair_manager = r2d2_mysql::MysqlConnectionManager::new(
         mysql::OptsBuilder::new()
-            .ip_or_hostname(Some("10.164.50.101"))
+            .ip_or_hostname(Some(
+                env::var("CHAIR_MYSQL_HOST").unwrap_or_else(|_| "10.164.50.101".to_owned()),
+            ))
             .tcp_port(mysql_connection_env.port)
             .user(Some(&mysql_connection_env.user))
             .db_name(Some(&mysql_connection_env.db_name))
@@ -78,7 +80,9 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to create connection pool");
     let estate_manager = r2d2_mysql::MysqlConnectionManager::new(
         mysql::OptsBuilder::new()
-            .ip_or_hostname(Some("10.164.50.102"))
+            .ip_or_hostname(Some(
+                env::var("ESTATE_MYSQL_HOST").unwrap_or_else(|_| "10.164.50.102".to_owned()),
+            ))
             .tcp_port(mysql_connection_env.port)
             .user(Some(&mysql_connection_env.user))
             .db_name(Some(&mysql_connection_env.db_name))
